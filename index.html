@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>숙소 메시지·동기화 화면 모형</title>
+<meta name="description" content="제안용 데모: 예약과 연결된 게스트 메시지함, AI 초안 검토, 유형별 자동발송 규칙, 채널 동기화 상태. 서버·AI 없는 화면 모형, 가상 데이터.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#FFFFFF; --soft:#F6F7F9; --soft2:#EEF0F3; --line:#E3E6EA; --line2:#D3D8DE;
+  --text:#14171C; --sub:#535B67; --muted:#626A76;
+  --accent:#2457F5; --accent-ink:#1A44C9; --accent-weak:#EEF3FF;
+  --ok:#11764F; --warn:#8F5A00; --err:#BF2F1C;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --shadow:0 8px 28px rgba(16,24,40,.14);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:anywhere}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+
+/* 데모 띠 */
+.demo-strip{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;padding:6px 16px;background:var(--text);color:#fff;font-size:12px;text-align:center}
+.demo-strip b{font-weight:600}
+.demo-strip .short{display:none}
+
+/* 셸 */
+.shell{display:grid;grid-template-columns:216px 1fr;min-height:calc(100vh - 30px)}
+.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:calc(100vh - 30px)}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px 16px;font-weight:700;font-size:15px}
+.brand-mark{width:22px;height:22px;border-radius:6px;background:var(--accent);display:grid;place-items:center}
+.brand-mark svg{width:14px;height:14px}
+.brand small{display:block;font-weight:500;font-size:11px;color:var(--muted)}
+.nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:var(--r-sm);color:var(--sub);text-decoration:none;font-weight:500}
+.nav a svg{width:18px;height:18px;flex:none}
+.nav a:hover{background:var(--soft)}
+.nav a[aria-current="page"]{background:var(--accent-weak);color:var(--accent-ink);font-weight:600}
+.nav .count{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent-ink)}
+.side-foot{margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.side-foot .prop{color:var(--text);font-weight:600;font-size:13px}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:none}
+.tabbar{display:none}
+
+/* 공통 */
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:20px 24px 16px;border-bottom:1px solid var(--line)}
+.page-head h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.page-head p{margin:4px 0 0;color:var(--sub)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line2);background:#fff;font-weight:600;font-size:14px;white-space:nowrap}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-ink)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--accent-ink)}
+.btn.ghost:hover{background:var(--accent-weak)}
+.btn[disabled]{opacity:1;background:var(--soft2);border-color:var(--soft2);color:var(--muted);cursor:not-allowed}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn.sm::after{content:"";position:absolute;inset:-4px}
+.btn{position:relative}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;white-space:nowrap}
+.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.st.ok{color:var(--ok)} .st.warn{color:var(--warn)} .st.err{color:var(--err)} .st.info{color:var(--accent-ink)} .st.off{color:var(--muted)}
+.st.off::before{background:transparent;border:1.5px solid currentColor;width:5px;height:5px}
+.st.run::before{animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.35}}
+.tag{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:6px;background:var(--soft2);color:var(--sub);font-size:12px;font-weight:500;white-space:nowrap}
+.tag.accent{background:var(--accent-weak);color:var(--accent-ink)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.skel{background:linear-gradient(90deg,var(--soft2) 25%,#F7F8FA 50%,var(--soft2) 75%);background-size:200% 100%;animation:sk 1.2s infinite;border-radius:6px;height:12px}
+@keyframes sk{to{background-position:-200% 0}}
+.empty{padding:40px 24px;text-align:center;color:var(--sub)}
+.empty strong{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
+.note{font-size:12px;color:var(--muted)}
+.switch{display:inline-flex;align-items:center;gap:10px;min-height:44px;background:none;border:0;padding:0;text-align:left}
+.switch .track{width:40px;height:24px;border-radius:12px;background:var(--line2);position:relative;flex:none;transition:background .15s}
+.switch .track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+.switch[aria-checked="true"] .track{background:var(--accent)}
+.switch[aria-checked="true"] .track::after{transform:translateX(16px)}
+.switch.danger[aria-checked="true"] .track{background:var(--err)}
+
+/* 메시지함 */
+.inbox{display:grid;grid-template-columns:320px minmax(0,1fr) 312px;flex:1;min-height:0;height:calc(100vh - 30px)}
+.col{min-width:0;display:flex;flex-direction:column;min-height:0}
+.list-col{border-right:1px solid var(--line)}
+.list-head{padding:16px 16px 8px}
+.list-head h1{margin:0 0 10px;font-size:18px;font-weight:700}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:500;color:var(--sub);position:relative}
+.chip::after{content:"";position:absolute;inset:-4px 0}
+.chip[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:#fff}
+.chip .n{margin-left:4px;font-variant-numeric:tabular-nums}
+.threads{list-style:none;margin:0;padding:4px 8px 16px;overflow:auto;flex:1}
+.thread{display:block;width:100%;text-align:left;border:0;background:none;padding:12px;border-radius:var(--r-md);min-height:44px}
+.thread:hover{background:var(--soft)}
+.thread[aria-current="true"]{background:var(--accent-weak)}
+.t-row{display:flex;align-items:baseline;gap:8px}
+.t-name{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-ch{font-size:12px;color:var(--muted);white-space:nowrap}
+.t-time{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.t-prev{margin:2px 0 6px;color:var(--sub);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.unread .t-name::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:6px;vertical-align:middle}
+
+.conv-col{background:var(--soft)}
+.conv-head{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#fff;border-bottom:1px solid var(--line);min-height:64px}
+.conv-head h2{margin:0;font-size:16px;font-weight:700}
+.conv-head .sub{font-size:12px;color:var(--muted)}
+.back{display:none}
+.conv{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.day{align-self:center;font-size:12px;color:var(--muted)}
+.msg{max-width:min(560px,86%);display:flex;flex-direction:column;gap:4px}
+.msg .bubble{padding:10px 14px;border-radius:14px;background:#fff;border:1px solid var(--line);white-space:pre-wrap}
+.msg.host{align-self:flex-end;align-items:flex-end}
+.msg.host .bubble{background:var(--text);border-color:var(--text);color:#fff}
+.msg .trans{font-size:13px;color:var(--sub);padding:0 4px}
+.msg .meta{font-size:12px;color:var(--muted);padding:0 4px}
+.sysline{align-self:center;max-width:92%;font-size:12px;color:var(--sub);background:#fff;border:1px dashed var(--line2);border-radius:8px;padding:6px 10px;text-align:center}
+.composer{background:#fff;border-top:1px solid var(--line);padding:16px 20px}
+.draft-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.draft-head h3{margin:0;font-size:14px;font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;margin-left:auto}
+.seg button{min-height:32px;padding:0 12px;border:0;border-radius:999px;background:none;font-size:13px;color:var(--sub);position:relative}
+.seg button::after{content:"";position:absolute;inset:-6px 0}
+.seg button[aria-pressed="true"]{background:var(--soft2);color:var(--text);font-weight:600}
+textarea{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line2);border-radius:var(--r-md);padding:12px;line-height:1.55;background:#fff}
+textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-weak)}
+textarea[readonly]{background:var(--soft)}
+.basis{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:4px}
+.basis li{display:flex;gap:8px;font-size:12.5px;color:var(--sub)}
+.basis li svg{flex:none;width:14px;height:14px;margin-top:3px;color:var(--ok)}
+.basis li b{color:var(--text);font-weight:600}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.actions .grow{flex:1}
+.hint{font-size:12.5px;color:var(--warn)}
+.callout{border:1px solid var(--line);border-left:3px solid var(--warn);background:#fff;border-radius:var(--r-sm);padding:12px 14px;margin-bottom:12px}
+.callout.err{border-left-color:var(--err)}
+.callout.info{border-left-color:var(--accent)}
+.callout strong{display:block;font-size:14px;margin-bottom:2px}
+.callout p{margin:0;color:var(--sub);font-size:13px}
+.diff{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 0;font-size:13px}
+.diff dt{color:var(--muted)} .diff dd{margin:0}
+.diff .bad{color:var(--err);font-weight:600}
+
+.res-col{border-left:1px solid var(--line);overflow:auto;padding:16px}
+.res-col h3,.res-box h3{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--muted)}
+.kv{display:grid;grid-template-columns:72px 1fr;gap:8px 12px;margin:0 0 16px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500}
+.kv dd.changed{color:var(--accent-ink);font-weight:600}
+.res-sec{border-top:1px solid var(--line);padding-top:14px;margin-top:4px}
+.res-box{display:none}
+
+/* 규칙 */
+.wrap{padding:20px 24px 40px;max-width:1120px}
+.panel{border:1px solid var(--line);border-radius:var(--r-lg);background:#fff}
+.panel + .panel{margin-top:16px}
+.panel-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)}
+.panel-head h2{margin:0;font-size:15px;font-weight:700}
+.panel-head p{margin:0;color:var(--sub);font-size:13px;flex-basis:100%}
+.panel-head .right{margin-left:auto}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+.stats div{padding:14px 20px;border-right:1px solid var(--line)}
+.stats div:last-child{border-right:0}
+.stats dt{font-size:12px;color:var(--muted)}
+.stats dd{margin:2px 0 0;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.stats dd small{font-size:12px;color:var(--muted);font-weight:500;margin-left:2px}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:600;color:var(--muted);text-align:left;padding:10px 20px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:12px 20px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td .why{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.bar{display:flex;align-items:center;gap:10px;min-width:150px}
+.bar .b{flex:1;height:6px;border-radius:3px;background:var(--soft2);overflow:hidden}
+.bar .b i{display:block;height:100%;background:var(--text);border-radius:3px}
+.bar .b i.full{background:var(--accent)}
+.bar span{font-size:12.5px;color:var(--sub);white-space:nowrap}
+.set-grid{display:grid;grid-template-columns:repeat(3,1fr)}
+.set-grid > div{padding:16px 20px;border-right:1px solid var(--line)}
+.set-grid > div:last-child{border-right:0}
+.set-grid label,.set-grid .lab{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+select{min-height:44px;border:1px solid var(--line2);border-radius:var(--r-md);padding:0 36px 0 12px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23535B67' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;appearance:none;width:100%}
+.stop-on{background:#FFF5F3;border-color:#F3C9C1}
+
+/* 동기화 */
+.summary{display:grid;grid-template-columns:2fr 1fr 1fr 1fr}
+.summary > div{padding:16px 20px;border-right:1px solid var(--line)}
+.summary > div:last-child{border-right:0}
+.summary .lab{font-size:12px;color:var(--muted)}
+.summary .val{font-size:15px;font-weight:600;margin-top:4px}
+.summary .big{font-size:17px;font-weight:700;line-height:1.4}
+.sup{font-size:13px}
+.sup.y{color:var(--text)} .sup.n{color:var(--muted)} .sup.q{color:var(--warn)}
+.jobs{list-style:none;margin:0;padding:0}
+.job{display:grid;grid-template-columns:1fr auto;gap:8px 16px;padding:14px 20px;border-bottom:1px solid var(--line);align-items:center}
+.job:last-child{border-bottom:0}
+.job .what{font-weight:600}
+.job .det{font-size:13px;color:var(--sub);margin-top:2px}
+.job .act{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.log{list-style:none;margin:0;padding:8px 20px 14px}
+.log li{display:grid;grid-template-columns:52px 1fr;gap:12px;padding:6px 0;font-size:13px;color:var(--sub)}
+.log li time{color:var(--muted);font-variant-numeric:tabular-nums}
+.m-only{display:none}
+.foot-note{padding:12px 20px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+.demo-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px;font-size:12px;color:var(--muted)}
+
+/* 토스트·대화상자 */
+.toasts{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:50;width:min(440px,calc(100% - 32px))}
+.toast{background:var(--text);color:#fff;border-radius:12px;padding:12px 16px;font-size:13.5px;box-shadow:var(--shadow);animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(8px);opacity:0}}
+.scrim{position:fixed;inset:0;background:rgba(20,23,28,.4);display:grid;place-items:center;z-index:60;padding:16px}
+.dialog{background:#fff;border-radius:var(--r-lg);max-width:440px;width:100%;padding:24px;box-shadow:var(--shadow)}
+.dialog h2{margin:0 0 8px;font-size:17px}
+.dialog p{margin:0 0 16px;color:var(--sub)}
+.dialog .actions{justify-content:flex-end}
+
+[hidden]{display:none!important}
+
+/* 반응형 */
+@media (max-width:1279px){
+  .inbox{grid-template-columns:300px minmax(0,1fr)}
+  .res-col{display:none}
+  .res-box{display:block;background:#fff;border-bottom:1px solid var(--line)}
+  .res-box summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;font-size:13px;color:var(--sub)}
+  .res-box summary::-webkit-details-marker{display:none}
+  .res-box summary b{color:var(--text);font-weight:600}
+  .res-box summary .chev{margin-left:auto;transition:transform .15s}
+  .res-box[open] summary .chev{transform:rotate(180deg)}
+  .res-box .inner{padding:4px 20px 12px}
+  .summary{grid-template-columns:1fr 1fr}
+  .summary > div:nth-child(2){border-right:0}
+  .summary > div:nth-child(-n+2){border-bottom:1px solid var(--line)}
+}
+@media (max-width:1023px){
+  .shell{grid-template-columns:1fr}
+  .side{display:none}
+  .topbar{display:flex;align-items:center;gap:8px;padding:0 16px;height:52px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:20}
+  .topbar .brand{padding:0;font-size:15px}
+  .topbar .prop{margin-left:auto;font-size:12px;color:var(--muted)}
+  .tabbar{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;color:var(--muted);text-decoration:none;font-size:11.5px;font-weight:500}
+  .tabbar a svg{width:20px;height:20px}
+  .tabbar a[aria-current="page"]{color:var(--accent-ink);font-weight:600}
+  .main{padding-bottom:64px}
+  .inbox{height:calc(100vh - 30px - 52px - 64px)}
+  .wrap{padding:16px 16px 32px}
+  .page-head{padding:16px}
+}
+@media (max-width:767px){
+  body{font-size:14px}
+  .demo-strip .long{display:none}.demo-strip .short{display:inline}
+  body.chat .tabbar{display:none}
+  body.chat .main{padding-bottom:0}
+  .inbox{grid-template-columns:1fr;height:auto;min-height:calc(100vh - 146px)}
+  .inbox.open .list-col{display:none}
+  .inbox:not(.open) .conv-col{display:none}
+  .list-col{border-right:0}
+  .threads{overflow:visible}
+  .back{display:inline-flex;width:44px;height:44px;margin-left:-12px;border:0;background:none;align-items:center;justify-content:center;border-radius:50%}
+  .back svg{width:22px;height:22px}
+  .conv-head{padding:8px 16px;position:sticky;top:52px;z-index:10}
+  .conv{padding:16px;overflow:visible}
+  .composer{padding:16px}
+  .res-box summary,.res-box .inner{padding-left:16px;padding-right:16px}
+  .msg{max-width:92%}
+  .seg{margin-left:0}
+  .actions .btn{flex:1}
+  .actions .grow{display:none}
+  .page-head{flex-direction:column;align-items:stretch}
+  .stats{grid-template-columns:1fr 1fr}
+  .stats div{border-bottom:1px solid var(--line)}
+  .stats div:nth-child(2n){border-right:0}
+  .stats div:last-child{grid-column:1/-1;border-bottom:0}
+  .set-grid{grid-template-columns:1fr}
+  .set-grid > div{border-right:0;border-bottom:1px solid var(--line)}
+  .set-grid > div:last-child{border-bottom:0}
+  .panel-head{padding:14px 16px}
+  .panel-head .right{margin-left:0;width:100%}
+  /* 표 → 줄 목록 */
+  .rtable thead{display:none}
+  .rtable tr{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding:14px 16px;border-bottom:1px solid var(--line);align-items:center}
+  .rtable td.c-n{text-align:right;font-size:12.5px;color:var(--sub)}
+  .rtable td.c-act{grid-column:1/-1;text-align:left!important}
+  .rtable td.c-act:empty{display:none}
+  .rtable td.c-bar{grid-column:1/-1}
+  .rtable td.c-full{order:0}.rtable td.c-st{order:1}.rtable td.c-n{order:2}.rtable td.c-bar{order:3}.rtable td.c-act{order:4}
+  .rtable td[data-l]:not([data-l=""])::before{display:none}
+  .rtable tr:last-child{border-bottom:0}
+  .rtable td{padding:0;border:0}
+  .rtable td[data-l]::before{content:attr(data-l);display:block;font-size:11.5px;color:var(--muted)}
+  .rtable .c-full{grid-column:1/-1}
+  .ctable thead{display:none}
+  .ctable tr{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .ctable tr:last-child{border-bottom:0}
+  .ctable td{padding:0;border:0}
+  .ctable td[data-l]::before{content:attr(data-l);display:block;font-size:11.5px;color:var(--muted)}
+  .ctable .c-name{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
+  .ctable .c-last{grid-column:1/-1;font-size:12.5px;color:var(--sub)}
+  .m-only{display:inline}
+  .summary{grid-template-columns:repeat(3,1fr)}
+  .summary > div{padding:14px 12px;border-bottom:0!important}
+  .summary > div:first-child{grid-column:1/-1;border-right:0;border-bottom:1px solid var(--line)!important;padding:14px 16px}
+  .summary > div:nth-child(2),.summary > div:nth-child(3){border-right:1px solid var(--line)}
+  .summary > div:nth-child(4){border-right:0}
+  .summary .val .note{display:block}
+  .job{grid-template-columns:1fr;padding:14px 16px}
+  .job .act{justify-content:flex-start}
+  .log{padding:8px 16px 14px}
+  .foot-note{padding:12px 16px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="demo-strip" role="note"><b>제안용 데모</b><span class="long">화면 모형 · 서버 없음 · AI 응답은 미리 써 둔 가상 문장 · 숙소·손님·예약 모두 가상</span><span class="short">화면 모형 · 서버·AI 없음 · 가상 데이터</span></div>
+
+<div class="shell">
+  <aside class="side" aria-label="주 메뉴">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M4 11 12 5l8 6v8H4z"/></svg></span><span>오늘숙소<small>운영 화면 (가상)</small></span></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot"><div class="prop">서촌 한옥 별채 외 2곳</div>시험 숙소 · 가상 데이터</div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M4 11 12 5l8 6v8H4z"/></svg></span>오늘숙소</div><span class="prop">숙소 3곳 · 가상</span></header>
+    <main id="view" tabindex="-1"></main>
+  </div>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="주 메뉴"></nav>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<div id="modal"></div>
+
+<script>
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ICON = {
+  inbox: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+  rules: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
+  sync: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
+  chev: '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
+};
+
+/* ---------- 가상 데이터 ---------- */
+const TYPES = [
+  { id: 'checkin', name: '체크인 안내', mode: 'observe', days: 21, edits: 0, n: 34, since: '10/9' },
+  { id: 'wifi', name: '와이파이', mode: 'auto', days: 28, edits: 0, n: 19, since: '9/18' },
+  { id: 'parking', name: '주차·위치', mode: 'observe', days: 28, edits: 0, n: 12, since: '10/2' },
+  { id: 'luggage', name: '짐 보관', mode: 'observe', days: 9, edits: 1, n: 7, since: '10/21' },
+  { id: 'checkout', name: '체크아웃 시간', mode: 'observe', days: 14, edits: 0, n: 9, since: '10/16' },
+  { id: 'change', name: '날짜·인원 변경, 조기 체크인', mode: 'draft', fixed: '운영자 결정이 필요해 초안까지만 만들어요' },
+  { id: 'refund', name: '환불·금액·클레임', mode: 'never', fixed: '초안도 자동발송도 하지 않아요' },
+];
+const typeName = (id) => TYPES.find((t) => t.id === id)?.name || id;
+const KB = {
+  checkin: '숙소 안내 · 체크인 15:00, 도어락 번호는 도착일 오전 10시에 발송',
+  parking: '숙소 안내 · 주차 공간 없음, 근처 공영주차장 도보 4분',
+  luggage: '숙소 안내 · 체크인 전 짐 보관 가능(1층 보관함, 11:00부터)',
+  checkout: '숙소 안내 · 체크아웃 11:00',
+  wifi: '숙소 안내 · 와이파이 이름·비밀번호(객실별)',
+};
+const S = {
+  route: 'inbox', filter: 'all', sel: null, open: false, loading: true, langView: {}, sending: new Set(), syncErr: false, syncLoading: false,
+  globalStop: false, hours: '08:00–22:00', checkinTime: '체크인 전날 15:00', rule4w: '28일 연속 무수정 + 10건 이상',
+  threads: [
+    { id: 't1', name: 'Emily Carter', ch: 'Airbnb', lang: 'English', time: '19:38', unread: true, types: ['checkin', 'parking'], state: 'draft',
+      res: { no: 'HM-2411-0381', prop: '서촌 한옥 별채 · 마루방', date: '11/2(일) – 11/4(화) · 2박', guests: '성인 2', status: '확정', amount: '384,000원', checked: '19:42' },
+      msgs: [{ who: 'guest', text: "Hi! What time can we check in on Sunday? Also, is there somewhere to park a car nearby?", tr: '안녕하세요! 일요일 체크인은 몇 시부터인가요? 그리고 근처에 차를 댈 곳이 있을까요?', at: '19:38' }],
+      draft: { text: "Hi Emily, thanks for your message!\nCheck-in on Sunday, Nov 2 is from 3:00 PM, and we'll send the door code on the morning of your arrival.\nThe house has no parking space, but there is a public parking lot about a 4-minute walk away.\nLet us know if you need anything else.", tr: '에밀리 님, 연락 주셔서 감사합니다!\n11월 2일 일요일 체크인은 오후 3시부터이고, 도어락 번호는 도착일 오전에 보내 드려요.\n숙소에는 주차 공간이 없지만 걸어서 4분 거리에 공영주차장이 있어요.\n더 필요한 것이 있으면 말씀해 주세요.',
+        basis: [['예약 원본', 'Channex 재조회 11/2–11/4 · 2인 · 확정', '19:42'], ['숙소 안내', KB.checkin, '10/12 수정'], ['숙소 안내', KB.parking, '10/12 수정']] } },
+    { id: 't2', name: '佐藤 美咲', ch: 'Booking.com', lang: '日本語', time: '19:21', unread: true, types: ['luggage'], state: 'draft',
+      res: { no: 'BK-4417-2096', prop: '남산 스테이 · 2층 트윈', date: '11/1(토) – 11/3(월) · 2박', guests: '성인 2', status: '확정', amount: '296,000원', checked: '19:22' },
+      msgs: [{ who: 'guest', text: 'チェックインの前に荷物を預けることはできますか？到着は11時ごろです。', tr: '체크인 전에 짐을 맡길 수 있을까요? 11시쯤 도착해요.', at: '19:21' }],
+      draft: { text: '佐藤様\nご連絡ありがとうございます。チェックイン前のお荷物のお預かりは11時から可能です。1階の荷物保管スペースをご利用ください。\nチェックインは15時からです。お気をつけてお越しください。', tr: '사토 님\n연락 감사합니다. 체크인 전 짐 보관은 11시부터 가능해요. 1층 짐 보관 공간을 이용해 주세요.\n체크인은 15시부터예요. 조심히 오세요.',
+        basis: [['예약 원본', 'Channex 재조회 11/1–11/3 · 2인 · 확정', '19:22'], ['숙소 안내', KB.luggage, '10/21 수정'], ['숙소 안내', KB.checkin, '10/12 수정']] } },
+    { id: 't4', name: 'Lukas Weber', ch: 'Booking.com', lang: 'English', time: '18:57', unread: true, types: ['checkin'], state: 'mismatch',
+      res: { no: 'BK-4417-1873', prop: '서촌 한옥 별채 · 사랑방', date: '11/7(금) – 11/9(일) · 2박', guests: '성인 2', status: '확정', amount: '352,000원', checked: '18:58' },
+      origin: { date: '11/8(토) – 11/10(월) · 2박' },
+      msgs: [{ who: 'guest', text: 'Hi, just to confirm - we arrive on the 8th, right? What time is check-in?', tr: '확인차 여쭤요. 8일 도착 맞죠? 체크인은 몇 시인가요?', at: '18:57' }],
+      draft: { text: "Hi Lukas, yes - your stay is from Saturday, Nov 8 to Monday, Nov 10 (2 nights).\nCheck-in is from 3:00 PM, and we'll send the door code on the morning of Nov 8.\nSee you soon!", tr: '루카스 님, 맞아요. 11월 8일 토요일부터 11월 10일 월요일까지 2박이에요.\n체크인은 오후 3시부터이고, 도어락 번호는 11월 8일 오전에 보내 드려요.\n곧 뵐게요!',
+        basis: [['예약 원본', 'Channex 재조회 11/8–11/10 · 2인 · 확정 (변경 반영)', ''], ['숙소 안내', KB.checkin, '10/12 수정']] } },
+    { id: 't3', name: '王伟', ch: 'Airbnb', lang: '中文', time: '18:40', unread: false, types: ['refund'], state: 'human',
+      res: { no: 'HM-2411-0402', prop: '남산 스테이 · 3층 더블', date: '11/5(수) – 11/6(목) · 1박', guests: '성인 2', status: '확정', amount: '148,000원', checked: '18:41' },
+      msgs: [{ who: 'guest', text: '我们的航班取消了，可以全额退款吗？', tr: '저희 항공편이 취소됐어요. 전액 환불이 될까요?', at: '18:40' }] },
+    { id: 't7', name: 'Hannah Kim', ch: 'Airbnb', lang: 'English', time: '15:00', unread: false, types: ['checkin'], state: 'draft', auto: true,
+      res: { no: 'HM-2410-0977', prop: '서촌 한옥 별채 · 마루방', date: '10/31(금) – 11/2(일) · 2박', guests: '성인 1', status: '확정', amount: '362,000원', checked: '15:00' },
+      msgs: [],
+      draft: { text: "Hi Hannah, we're looking forward to your stay tomorrow!\nCheck-in is from 3:00 PM on Friday, Oct 31. We'll send the door code tomorrow morning at 10:00.\nThe house has no parking space; the nearest public parking lot is a 4-minute walk away.", tr: '해나 님, 내일 뵙기를 기다리고 있어요!\n10월 31일 금요일 체크인은 오후 3시부터예요. 도어락 번호는 내일 오전 10시에 보내 드려요.\n숙소에 주차 공간은 없고, 가까운 공영주차장은 걸어서 4분이에요.',
+        basis: [['예약 원본', 'Channex 재조회 10/31–11/2 · 1인 · 확정', '15:00'], ['숙소 안내', KB.checkin, '10/12 수정'], ['숙소 안내', KB.parking, '10/12 수정']] } },
+    { id: 't8', name: 'Nguyen Thi Lan', ch: 'Agoda', lang: 'English', time: '15:00', unread: false, types: ['checkin'], state: 'unsupported', auto: true,
+      res: { no: 'AG-7731-0158', prop: '남산 스테이 · 2층 트윈', date: '10/31(금) – 11/1(토) · 1박', guests: '성인 2', status: '확정', amount: '139,000원', checked: '15:00' },
+      msgs: [],
+      draft: { text: "Hi Lan, we're looking forward to your stay tomorrow!\nCheck-in is from 3:00 PM on Friday, Oct 31. We'll send the door code tomorrow morning at 10:00.", tr: '란 님, 내일 뵙기를 기다리고 있어요!\n10월 31일 금요일 체크인은 오후 3시부터예요. 도어락 번호는 내일 오전 10시에 보내 드려요.',
+        basis: [['예약 원본', 'Channex 재조회 10/31–11/1 · 2인 · 확정', '15:00'], ['숙소 안내', KB.checkin, '10/12 수정']] } },
+    { id: 't6', name: 'Marco Rossi', ch: 'Booking.com', lang: 'English', time: '14:12', unread: false, types: ['checkout'], state: 'failed',
+      res: { no: 'BK-4417-1650', prop: '서촌 한옥 별채 · 사랑방', date: '10/29(수) – 10/31(금) · 2박', guests: '성인 2', status: '투숙 중', amount: '348,000원', checked: '14:12' },
+      msgs: [{ who: 'guest', text: 'What time is check-out on Friday?', tr: '금요일 체크아웃은 몇 시인가요?', at: '14:10' }, { who: 'host', text: 'Hi Marco, check-out is at 11:00 AM on Friday. Thank you for staying with us!', at: '14:12', failed: true }] },
+    { id: 't5', name: '김서윤', ch: 'Airbnb', lang: '한국어', time: '13:05', unread: false, types: ['wifi'], state: 'autosent',
+      res: { no: 'HM-2410-0951', prop: '남산 스테이 · 3층 더블', date: '10/30(목) – 11/1(토) · 2박', guests: '성인 2', status: '투숙 중', amount: '286,000원', checked: '13:05' },
+      msgs: [{ who: 'guest', text: '와이파이 비밀번호가 뭐예요?', at: '13:04' }, { who: 'host', text: '안녕하세요 서윤 님! 3층 더블룸 와이파이는 객실 TV 옆 안내 카드에 적힌 이름과 비밀번호로 연결하시면 돼요. 연결이 안 되면 말씀해 주세요.', at: '13:05', auto: true }] },
+    { id: 't9', name: 'Olivia', ch: 'Airbnb', lang: 'English', time: '어제', unread: false, types: ['change'], state: 'inquiry', res: null,
+      msgs: [{ who: 'guest', text: 'Hi, is the hanok available from Dec 12 to Dec 14 for 3 adults?', tr: '12월 12일부터 14일까지 성인 3명 묵을 수 있나요?', at: '어제 22:14' }] },
+  ],
+  channels: [
+    { id: 'airbnb', name: 'Airbnb', res: 'y', inv: 'y', rate: 'y', msg: 'y', last: '19:41', st: 'ok' },
+    { id: 'booking', name: 'Booking.com', res: 'y', inv: 'y', rate: 'y', msg: 'y', last: '19:40', st: 'warn' },
+    { id: 'agoda', name: 'Agoda', res: 'y', inv: 'y', rate: 'y', msg: 'n', last: '19:12', st: 'warn' },
+    { id: 'trip', name: 'Trip.com', res: 'y', inv: 'y', rate: 'q', msg: 'n', last: '18:55', st: 'err' },
+  ],
+  jobs: [
+    { id: 'j1', kind: '요금 전송', ch: 'Agoda', det: '남산 스테이 2층 트윈 · 11/14–11/16 · 3개 날짜', err: '429 호출 제한', mode: 'auto', tries: 2, wait: 8 },
+    { id: 'j2', kind: '메시지 발송', ch: 'Booking.com', det: 'Marco Rossi 체크아웃 답장 · 메시지 키 MSG-1650-02', err: '응답 시간 초과', mode: 'manual', link: 't6' },
+    { id: 'j3', kind: '재고 전송', ch: 'Trip.com', det: '서촌 한옥 별채 마루방 · 11/2–11/4 판매 마감', err: '인증 만료', mode: 'reauth' },
+    { id: 'j4', kind: '예약 변경 반영', ch: 'Booking.com', det: 'Lukas Weber · 날짜 변경(11/7→11/8) 알림이 내부 예약에 반영 안 됨', err: '원본과 다름', mode: 'refetch', link: 't4' },
+  ],
+  log: [
+    ['19:41', 'Airbnb 예약 변경 알림 처리 · 변경 내역 저장 후 ACK'],
+    ['19:40', '10분 점검 · 피드에 ACK 안 된 변경 0건'],
+    ['19:12', 'Agoda 요금 전송 429 · 자동 재시도 예약'],
+    ['18:55', 'Trip.com 재고 전송 인증 만료 · 자동 재시도 멈춤, 운영자 알림'],
+  ],
+};
+let FAKE_NOW = '19:52';
+function nowStr() { const [h, m] = FAKE_NOW.split(':').map(Number); const t = h * 60 + m + 1; FAKE_NOW = String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); return FAKE_NOW; }
+
+/* ---------- 공통 ---------- */
+function toast(msg) {
+  const box = $('#toasts'); const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; box.appendChild(d);
+  setTimeout(() => d.remove(), 3600); while (box.children.length > 3) box.firstChild.remove();
+}
+function confirmDialog(title, body, okLabel, danger) {
+  return new Promise((resolve) => {
+    const prev = document.activeElement;
+    $('#modal').innerHTML = `<div class="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-b"><h2 id="dlg-t">${esc(title)}</h2><p id="dlg-b">${esc(body)}</p><div class="actions"><button class="btn" data-a="no">취소</button><button class="btn primary" data-a="yes"${danger ? ' style="background:var(--err);border-color:var(--err)"' : ''}>${esc(okLabel)}</button></div></div></div>`;
+    const close = (v) => { $('#modal').innerHTML = ''; document.removeEventListener('keydown', onKey); prev && prev.focus && prev.focus(); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') close(false); if (e.key === 'Tab') { const b = [...document.querySelectorAll('#modal button')]; const i = b.indexOf(document.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); b[b.length - 1].focus(); } else if (!e.shiftKey && i === b.length - 1) { e.preventDefault(); b[0].focus(); } } };
+    document.addEventListener('keydown', onKey);
+    $('#modal').onclick = (e) => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) close(a === 'yes'); else if (e.target.classList.contains('scrim')) close(false); };
+    $('#modal [data-a="yes"]').focus();
+  });
+}
+const STATE_LABEL = {
+  draft: ['초안 확인 필요', 'info'], mismatch: ['예약 불일치', 'warn'], human: ['운영자 답변 필요', 'warn'], failed: ['발송 실패', 'err'],
+  autosent: ['자동발송됨', 'ok'], sent: ['보냄', 'ok'], unsupported: ['이 화면에서 발송 불가', 'off'], inquiry: ['예약 없는 문의', 'warn'],
+};
+function needsAction(t) { return ['draft', 'mismatch', 'human', 'failed', 'inquiry', 'unsupported'].includes(t.state); }
+function navCounts() { return { inbox: S.threads.filter(needsAction).length, sync: S.jobs.length }; }
+function renderNav() {
+  const c = navCounts();
+  const items = [['inbox', '메시지', ICON.inbox, c.inbox], ['rules', '메시지 규칙', ICON.rules, 0], ['sync', '채널 동기화', ICON.sync, c.sync]];
+  $('#nav').innerHTML = items.map(([r, l, i, n]) => `<a href="#/${r}" ${S.route === r ? 'aria-current="page"' : ''}>${i}<span>${l}</span>${n ? `<span class="count num" aria-label="처리할 일 ${n}건">${n}</span>` : ''}</a>`).join('');
+  $('#tabbar').innerHTML = items.map(([r, l, i, n]) => `<a href="#/${r}" ${S.route === r ? 'aria-current="page"' : ''}>${i}<span>${l}${n ? ` <span class="num">${n}</span>` : ''}</span></a>`).join('');
+}
+
+/* ---------- 메시지함 ---------- */
+const FILTERS = [['all', '전체'], ['todo', '확인 필요'], ['checkin', '체크인 안내'], ['human', '운영자 답변']];
+function filtered() {
+  return S.threads.filter((t) => S.filter === 'all' ? true : S.filter === 'todo' ? needsAction(t) : S.filter === 'checkin' ? (t.auto && t.state === 'draft') : ['human', 'inquiry'].includes(t.state));
+}
+function threadPreview(t) { const m = t.msgs[t.msgs.length - 1]; if (!m) return t.auto ? '체크인 안내 초안이 준비됐어요 (체크인 전날 자동 생성)' : ''; return (m.who === 'host' ? '나: ' : '') + m.text; }
+function renderThreads() {
+  const ul = $('#threads'); if (!ul) return;
+  if (S.loading) { ul.innerHTML = Array.from({ length: 6 }, () => `<li aria-hidden="true" style="padding:14px 12px"><div class="skel" style="width:46%"></div><div class="skel" style="width:88%;margin-top:10px"></div><div class="skel" style="width:30%;margin-top:10px"></div></li>`).join(''); ul.setAttribute('aria-busy', 'true'); return; }
+  ul.removeAttribute('aria-busy');
+  const list = filtered();
+  if (!list.length) { ul.innerHTML = `<li class="empty"><strong>여기에 해당하는 대화가 없어요</strong>${S.filter === 'checkin' ? '내일 체크인하는 예약의 안내 초안은 매일 15:00에 만들어져요.' : '새 메시지가 오면 여기에 보여요.'}</li>`; return; }
+  ul.innerHTML = list.map((t) => { const [lab, cls] = STATE_LABEL[t.state]; return `<li><button class="thread ${t.unread ? 'unread' : ''}" data-t="${t.id}" ${S.sel === t.id ? 'aria-current="true"' : ''}>
+    <span class="t-row"><span class="t-name">${esc(t.name)}</span><span class="t-ch">${esc(t.ch)}</span><span class="t-time num">${esc(t.time)}</span></span>
+    <span class="t-prev" style="display:block">${esc(threadPreview(t))}</span>
+    <span class="t-meta"><span class="st ${cls}">${lab}</span>${t.auto ? '<span class="tag">자동 안내</span>' : ''}<span class="tag">${esc(t.lang)}</span></span></button></li>`; }).join('');
+}
+function resDL(t) {
+  if (!t.res) return `<p class="note" style="margin:0 0 12px">예약 전 문의라 연결된 예약이 없어요. 날짜·인원 문의는 운영자가 직접 답해요.</p>`;
+  const r = t.res; const changed = t.fixedDate;
+  return `<dl class="kv"><dt>채널</dt><dd>${esc(t.ch)} · <span class="mono">${esc(r.no)}</span></dd><dt>숙소</dt><dd>${esc(r.prop)}</dd><dt>일정</dt><dd class="${changed ? 'changed' : ''}">${esc(r.date)}</dd><dt>인원</dt><dd>${esc(r.guests)}</dd><dt>상태</dt><dd>${esc(r.status)}</dd><dt>금액</dt><dd class="num">${esc(r.amount)}</dd><dt>확인 시각</dt><dd class="num">${esc(r.checked)} <span class="st ${t.state === 'mismatch' ? 'warn' : 'ok'}" style="margin-left:4px">${t.state === 'mismatch' ? '원본과 다름' : '원본과 같음'}</span></dd></dl>`;
+}
+function resExtra(t) {
+  if (!t.res) return '';
+  return `<div class="res-sec"><h3>이 대화</h3><button class="switch danger" role="switch" aria-checked="${!!t.paused}" data-act="pause"><span class="track" aria-hidden="true"></span><span>자동발송 멈춤<span class="note" style="display:block">켜면 이 손님에게는 허용된 유형도 초안까지만 만들어요</span></span></button>
+  <p class="note" style="margin:8px 0 0">문의 유형: ${t.types.map(typeName).join(', ')}</p></div>`;
+}
+function renderConv() {
+  const col = $('#conv'); if (!col) return;
+  const t = S.threads.find((x) => x.id === S.sel);
+  $('#inbox').classList.toggle('open', S.open && !!t);
+  document.body.classList.toggle('chat', S.route === 'inbox' && S.open && !!t);
+  if (!t) { col.innerHTML = `<div class="empty" style="margin:auto"><strong>대화를 고르세요</strong>왼쪽 목록에서 손님을 누르면 예약 정보와 AI 초안이 함께 보여요.</div>`; $('#res').innerHTML = ''; return; }
+  const lv = S.langView[t.id] || 'guest';
+  const msgs = t.msgs.map((m) => m.who === 'guest'
+    ? `<div class="msg"><div class="bubble" lang="${langCode(t.lang)}">${esc(m.text)}</div>${m.tr ? `<div class="trans">번역 · ${esc(m.tr)}</div>` : ''}<div class="meta num">${esc(t.name)} · ${esc(m.at)}</div></div>`
+    : `<div class="msg host"><div class="bubble">${esc(m.text)}</div><div class="meta num">${m.failed ? '<span class="st err">발송 실패 · 응답 시간 초과</span>' : m.auto ? '자동발송 · 와이파이 유형 · ' + esc(m.at) : (m.edited ? '운영자가 고쳐서 보냄 · ' : '운영자 확인 후 보냄 · ') + esc(m.at)}</div></div>`).join('');
+  const sys = [];
+  if (t.auto) sys.push(`<div class="sysline">체크인 전날 15:00 · 체크인 안내 초안을 자동으로 만들었어요. 운영자가 확인해야 보내져요.</div>`);
+  if (t.state === 'human') sys.push(`<div class="sysline">환불·금액 문의라서 AI 초안을 만들지 않았어요 · 18:40</div>`);
+  if (t.state === 'inquiry') sys.push(`<div class="sysline">예약 가능 여부·인원 문의라서 AI 초안을 만들지 않았어요</div>`);
+  if (t.state === 'autosent') sys.push(`<div class="sysline">와이파이 유형은 28일 연속 무수정 검증을 통과해 자동발송이 허용돼 있어요</div>`);
+  const resBox = `<details class="res-box"><summary><b>연결된 예약</b><span>${t.res ? esc(t.res.date) : '없음'}</span>${ICON.chev}</summary><div class="inner">${resDL(t)}${resExtra(t)}</div></details>`;
+  col.innerHTML = `<div class="conv-head"><button class="back" data-act="back" aria-label="대화 목록으로">${ICON.back}</button><div><h2>${esc(t.name)}</h2><div class="sub">${esc(t.ch)} · ${esc(t.lang)}${t.res ? ' · ' + esc(t.res.prop) : ''}</div></div></div>
+    ${resBox}<div class="conv" id="conv-body" aria-label="대화 내용">${t.auto ? sys[0] : ''}${msgs}${(t.auto ? sys.slice(1) : sys).join('')}</div>${composer(t, lv)}`;
+  $('#res').innerHTML = `<h3>연결된 예약</h3>${resDL(t)}${resExtra(t)}`;
+  const cb = $('#conv-body'); if (cb && window.innerWidth >= 768) cb.scrollTop = cb.scrollHeight;
+}
+function langCode(l) { return { English: 'en', '日本語': 'ja', '中文': 'zh', '한국어': 'ko' }[l] || 'en'; }
+function basisList(d) { return `<ul class="basis" aria-label="초안 근거">${d.basis.map(([k, v, at]) => `<li>${ICON.check}<span><b>${esc(k)}</b> · ${esc(v)}${at ? ` <span class="num">(${esc(at)})</span>` : ''}</span></li>`).join('')}</ul>`; }
+function composer(t, lv) {
+  if (t.state === 'mismatch') {
+    if (t.refetching) return `<div class="composer" aria-busy="true"><div class="callout info"><strong>Channex에서 예약 원본을 다시 불러오는 중이에요</strong><p>원본 확인이 끝나야 AI 초안을 만들어요.</p></div><div class="skel" style="width:70%"></div><div class="skel" style="width:52%;margin-top:10px"></div></div>`;
+    return `<div class="composer"><div class="callout"><strong>예약 정보가 Channex 원본과 달라서 초안을 만들지 않았어요</strong><p>틀린 날짜로 답하지 않도록, 예약을 먼저 맞춘 뒤 초안을 만들어요.</p>
+      <dl class="diff"><dt>내부 기록</dt><dd class="bad">11/7(금) – 11/9(일)</dd><dt>Channex 원본</dt><dd>11/8(토) – 11/10(월) · 18:51 변경</dd></dl></div>
+      <div class="actions"><button class="btn primary" data-act="refetch">예약 원본 다시 불러오기</button><button class="btn" data-act="manual">직접 답하기</button></div></div>`;
+  }
+  if (t.state === 'human' || t.state === 'inquiry' || t.manual) {
+    return `<div class="composer"><div class="draft-head"><h3>직접 답장</h3><span class="tag">${t.state === 'human' ? '자동발송 제외 · 환불·금액' : t.state === 'inquiry' ? '운영자 결정 · 예약 가능 여부' : '직접 쓰기'}</span></div>
+      <label class="sr" for="reply">답장 내용</label><textarea id="reply" placeholder="${t.state === 'human' ? '환불 규정과 가능한 방법을 직접 안내해 주세요' : '손님에게 보낼 답장을 쓰세요'}">${esc(t.manualText || '')}</textarea>
+      <div class="actions"><span class="note grow">보내기 전에 한 번 더 확인해요. 같은 답장이 두 번 가지 않도록 메시지 키로 막아요.</span><button class="btn primary" data-act="send-manual">보내기</button></div></div>`;
+  }
+  if (t.state === 'failed') {
+    return `<div class="composer"><div class="callout err"><strong>14:12에 보낸 답장이 Booking.com에 닿았는지 확인되지 않았어요</strong><p>다시 보내면 같은 메시지 키(MSG-1650-02)로 보내서, 이미 전달된 경우 두 번 가지 않아요.</p></div>
+      <div class="actions"><button class="btn primary" data-act="resend" ${S.sending.has(t.id) ? 'disabled' : ''}>${S.sending.has(t.id) ? '확인하고 보내는 중…' : '다시 보내기'}</button></div></div>`;
+  }
+  if (t.state === 'autosent' || t.state === 'sent') {
+    return `<div class="composer"><div class="draft-head"><h3>${t.state === 'sent' ? '보냈어요' : '자동으로 답했어요'}</h3><span class="st ok">${t.state === 'sent' ? '운영자 확인 후 발송' : '자동발송'}</span></div><p class="note" style="margin:0">손님이 다시 메시지를 보내면 새 초안을 만들어요.</p><div class="actions"><button class="btn" data-act="manual">추가로 직접 쓰기</button></div></div>`;
+  }
+  // draft / unsupported
+  const d = t.draft; const txt = t.editedText ?? d.text;
+  const obs = t.types.map((id) => TYPES.find((x) => x.id === id)).filter((x) => x && x.mode === 'observe');
+  const sending = S.sending.has(t.id);
+  if (t.state === 'unsupported') {
+    return `<div class="composer"><div class="callout"><strong>Agoda는 Channex 메시지 API 대상이 아니라 여기서 보낼 수 없어요</strong><p>Channex 공개 문서 기준(지원: Airbnb·Booking.com·Expedia). 초안을 복사해 Agoda 관리 화면에서 보내 주세요.</p></div>
+      <div class="draft-head"><h3>체크인 안내 초안</h3><div class="seg" role="group" aria-label="초안 언어"><button data-lv="guest" aria-pressed="${lv === 'guest'}">${esc(t.lang)}</button><button data-lv="ko" aria-pressed="${lv === 'ko'}">한국어로 보기</button></div></div>
+      <label class="sr" for="draft">초안</label><textarea id="draft" readonly>${esc(lv === 'ko' ? d.tr : txt)}</textarea>${basisList(d)}
+      <div class="actions"><span class="grow"></span><button class="btn primary" data-act="copy">초안 복사하기</button></div></div>`;
+  }
+  return `<div class="composer"><div class="draft-head"><h3>AI 초안</h3><span class="tag accent">${t.types.map(typeName).join(' · ')}</span>
+      <div class="seg" role="group" aria-label="초안 언어"><button data-lv="guest" aria-pressed="${lv === 'guest'}">${esc(t.lang)}</button><button data-lv="ko" aria-pressed="${lv === 'ko'}">한국어로 보기</button></div></div>
+    <label class="sr" for="draft">${lv === 'ko' ? '초안 한국어 번역(읽기 전용)' : '손님에게 보낼 초안'}</label>
+    <textarea id="draft" ${lv === 'ko' ? 'readonly' : ''} ${sending ? 'disabled' : ''}>${esc(lv === 'ko' ? d.tr : txt)}</textarea>
+    ${basisList(d)}
+    ${t.editedText != null && obs.length ? `<p class="hint" id="edit-hint">고쳐서 보내면 '${obs.map((o) => o.name).join("', '")}' 유형의 4주 무수정 관찰이 처음부터 다시 시작돼요.</p>` : ''}
+    <div class="actions"><button class="btn" data-act="regen" ${sending ? 'disabled' : ''}>다시 만들기</button><span class="grow"></span><button class="btn primary" data-act="send" ${sending ? 'disabled' : ''}>${sending ? '보내는 중…' : '확인하고 보내기'}</button></div></div>`;
+}
+function viewInbox() {
+  return `<div class="inbox" id="inbox">
+    <section class="col list-col" aria-labelledby="inbox-h"><div class="list-head"><h1 id="inbox-h">메시지</h1>
+      <div class="filters" role="group" aria-label="대화 거르기">${FILTERS.map(([k, l]) => `<button class="chip" data-f="${k}" aria-pressed="${S.filter === k}">${l}<span class="n">${countFor(k)}</span></button>`).join('')}</div></div>
+      <ul class="threads" id="threads" aria-label="대화 목록"></ul></section>
+    <section class="col conv-col" id="conv" aria-label="대화"></section>
+    <aside class="res-col" id="res" aria-label="연결된 예약"></aside></div>`;
+}
+function countFor(k) { const keep = S.filter; S.filter = k; const n = filtered().length; S.filter = keep; return n; }
+
+async function sendDraft(t, kind) {
+  if (S.sending.has(t.id)) { toast('같은 답장을 이미 보내는 중이에요. 두 번 보내지 않아요.'); return; }
+  const ta = $('#draft'); if (ta && !ta.readOnly && t.state === 'draft') { if (ta.value !== t.draft.text) t.editedText = ta.value; }
+  const text = kind === 'manual' ? ($('#reply')?.value || '').trim() : (t.editedText ?? t.draft.text);
+  if (kind === 'manual' && !text) { const r = $('#reply'); r.setAttribute('aria-invalid', 'true'); r.focus(); toast('보낼 내용을 먼저 써 주세요.'); return; }
+  S.sending.add(t.id); renderConv();
+  await sleep(900);
+  S.sending.delete(t.id);
+  const edited = kind !== 'manual' && t.editedText != null && t.editedText !== t.draft.text;
+  t.msgs.push({ who: 'host', text, at: nowStr(), edited: edited || kind === 'manual' });
+  t.state = 'sent'; t.manual = false; t.unread = false; t.time = FAKE_NOW;
+  if (kind !== 'manual') {
+    t.types.forEach((id) => { const ty = TYPES.find((x) => x.id === id); if (!ty || ty.mode !== 'observe') return; ty.n++; if (edited) { ty.days = 0; ty.edits++; ty.since = '10/30'; } });
+  }
+  toast(edited ? '고쳐서 보냈어요. 해당 유형의 무수정 관찰을 다시 시작해요.' : '보냈어요.');
+  renderAll();
+}
+async function refetch(t) {
+  t.refetching = true; renderConv(); await sleep(1200);
+  t.refetching = false; t.res.date = t.origin.date; t.res.checked = nowStr(); t.fixedDate = true; t.state = 'draft'; t.draft.basis[0][2] = FAKE_NOW;
+  S.jobs = S.jobs.filter((j) => j.link !== t.id);
+  S.log.unshift([FAKE_NOW, `Booking.com 예약 ${t.res.no} 원본 재조회 · 날짜 변경 반영, 재고 다시 계산`]);
+  toast('예약을 원본에 맞췄어요. 맞춘 정보로 초안을 만들었어요.');
+  renderAll();
+}
+async function resend(t, fromSync) {
+  if (S.sending.has(t.id)) { toast('이미 다시 보내는 중이에요.'); return; }
+  S.sending.add(t.id); renderAll(); await sleep(1100); S.sending.delete(t.id);
+  const m = t.msgs.find((x) => x.failed); if (m) { m.failed = false; m.at = nowStr(); }
+  t.state = 'sent'; S.jobs = S.jobs.filter((j) => j.link !== t.id);
+  S.log.unshift([FAKE_NOW, 'Booking.com 메시지 MSG-1650-02 재전송 · 전달 확인']);
+  toast(fromSync ? '메시지를 다시 보냈어요. 메시지함에서도 정리됐어요.' : '다시 보냈어요. 전달을 확인했어요.');
+  renderAll();
+}
+
+/* ---------- 메시지 규칙 ---------- */
+const MODE = { observe: ['관찰 중', 'info'], auto: ['자동발송', 'ok'], draft: ['초안만', 'off'], never: ['제외', 'off'], paused: ['자동발송 멈춤', 'warn'] };
+function viewRules() {
+  const ty = TYPES;
+  const autoN = ty.filter((t) => t.mode === 'auto').length;
+  return `<div class="page-head"><div><h1>메시지 규칙</h1><p>AI는 먼저 초안만 만들어요. 문의 유형마다 4주 동안 고치지 않고 보낸 기록이 쌓이면, 운영자가 그 유형만 자동발송을 허용해요.</p></div>
+    <button class="switch danger" role="switch" aria-checked="${S.globalStop}" data-act="global"><span class="track" aria-hidden="true"></span><span><b>자동발송 전체 중지</b><span class="note" style="display:block">${S.globalStop ? '지금은 모든 메시지가 초안까지만 가요' : `허용된 유형 ${autoN}개가 자동발송 중`}</span></span></button></div>
+  <div class="wrap">
+    <section class="panel ${S.globalStop ? 'stop-on' : ''}" aria-labelledby="ty-h"><div class="panel-head"><h2 id="ty-h">문의 유형별 자동발송</h2><span class="tag">기준: ${esc(S.rule4w)}</span><span class="note right">통계: 최근 30일 · 예시 숫자</span></div>
+      <dl class="stats" aria-label="최근 30일 통계 (예시 숫자)"><div><dt>AI 초안</dt><dd>86<small>건</small></dd></div><div><dt>그대로 보냄</dt><dd>71<small>건</small></dd></div><div><dt>고쳐서 보냄</dt><dd>9<small>건</small></dd></div><div><dt>미처리</dt><dd>4<small>건</small></dd></div><div><dt>발송 실패</dt><dd>${S.threads.some((t) => t.state === 'failed') ? 2 : 1}<small>건</small></dd></div></dl>
+      <table class="rtable"><thead><tr><th>유형</th><th>상태</th><th>4주 무수정 관찰</th><th>최근 30일</th><th><span class="sr">동작</span></th></tr></thead><tbody>
+      ${ty.map((t) => { const [lab, cls] = S.globalStop && t.mode === 'auto' ? ['전체 중지 중', 'warn'] : MODE[t.mode];
+        const fixed = t.fixed;
+        const pct = fixed ? 0 : Math.min(100, t.days / 28 * 100);
+        const ready = t.mode === 'observe' && t.days >= 28 && t.edits === 0 && t.n >= 10;
+        const why = t.mode === 'observe' ? (ready ? '기준 통과 · 허용할 수 있어요' : t.days < 28 ? `${28 - t.days}일 더 관찰해야 해요` : '건수가 모자라요') : '';
+        const act = fixed ? '' : t.mode === 'auto' ? `<button class="btn sm" data-stop="${t.id}">멈추기</button>` : t.mode === 'paused' ? `<button class="btn sm" data-resume="${t.id}">다시 켜기</button>` : `<button class="btn sm ${ready ? 'primary' : ''}" data-allow="${t.id}" ${ready ? '' : `disabled aria-describedby="why-${t.id}"`}>자동발송 허용</button>`;
+        return `<tr data-ty="${t.id}"><td data-l="" class="c-full"><b>${esc(t.name)}</b>${fixed ? `<span class="why">${esc(fixed)}</span>` : ''}</td>
+          <td data-l="상태" class="c-st"><span class="st ${cls}">${lab}</span></td>
+          <td data-l="관찰" class="c-bar">${fixed ? '<span class="note">해당 없음</span>' : `<div class="bar"><span class="b" aria-hidden="true"><i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i></span><span class="num">${t.days}/28일${t.edits ? ` · 수정 ${t.edits}회로 ${esc(t.since)} 재시작` : ''}</span></div><span class="why" id="why-${t.id}">${esc(why)}</span>`}</td>
+          <td data-l="최근 30일" class="num c-n">${fixed ? '' : '<span class="m-only">최근 30일 </span>' + t.n + '건'}</td><td data-l="" class="c-act" style="text-align:right">${act}</td></tr>`; }).join('')}
+      </tbody></table>
+      <div class="foot-note">숫자는 예시예요. '수정'은 운영자가 초안을 고쳐서 보낸 경우예요. 환불·금액·클레임과 날짜·인원 변경은 기준과 상관없이 자동발송하지 않아요. 기준(28일·10건)은 계약 전에 귀사와 확정할 값이에요.</div>
+    </section>
+    <section class="panel" aria-labelledby="set-h"><div class="panel-head"><h2 id="set-h">보내는 시점</h2></div>
+      <div class="set-grid">
+        <div><label for="s-hours">자동발송 시간대</label><select id="s-hours" data-set="hours">${['08:00–22:00', '07:00–23:00', '하루 종일'].map((v) => `<option ${S.hours === v ? 'selected' : ''}>${v}</option>`).join('')}</select><p class="note" style="margin:6px 0 0">시간 밖에 온 문의는 초안으로 남겨요.</p></div>
+        <div><label for="s-checkin">체크인 안내 초안 만들기</label><select id="s-checkin" data-set="checkinTime">${['체크인 전날 15:00', '체크인 전날 18:00', '체크인 당일 09:00'].map((v) => `<option ${S.checkinTime === v ? 'selected' : ''}>${v}</option>`).join('')}</select><p class="note" style="margin:6px 0 0">손님 예약 언어로 만들고, 확인 대기함에 넣어요.</p></div>
+        <div><span class="lab">운영자가 먼저 답하면</span><p style="margin:0;font-weight:500">그 대화의 자동 초안·자동발송을 취소해요</p><p class="note" style="margin:6px 0 0">같은 손님에게 두 번 가지 않게 메시지 키로 막아요.</p></div>
+      </div></section>
+  </div>`;
+}
+
+/* ---------- 채널 동기화 ---------- */
+const SUP = { y: ['지원', 'y'], n: ['미지원', 'n'], q: ['미확인', 'q'] };
+function viewSync() {
+  if (S.syncLoading) return `<div class="page-head"><div><h1>채널 동기화</h1><p>불러오는 중이에요…</p></div></div><div class="wrap" aria-busy="true"><div class="panel" style="padding:20px">${Array.from({ length: 5 }, (_, i) => `<div class="skel" style="width:${[60, 90, 75, 85, 40][i]}%;margin-bottom:14px"></div>`).join('')}</div></div>`;
+  if (S.syncErr) return `<div class="page-head"><div><h1>채널 동기화</h1></div></div><div class="wrap"><div class="panel" role="alert"><div class="empty"><strong>동기화 상태를 불러오지 못했어요</strong>네트워크나 서버 응답 문제일 수 있어요. 잠시 뒤 다시 불러와 주세요.<div style="margin-top:16px"><button class="btn primary" data-act="sync-reload">다시 불러오기</button></div></div></div></div>`;
+  const bad = S.channels.filter((c) => c.st !== 'ok');
+  const head = !S.jobs.length ? '4개 채널 모두 정상이에요' : `확인할 작업이 ${S.jobs.length}건 있어요`;
+  const chSt = (c) => c.st === 'ok' ? '<span class="st ok">정상</span>' : c.st === 'warn' ? `<span class="st warn">${c.id === 'agoda' ? '재시도 대기' : '확인 필요'}</span>` : '<span class="st err">다시 연결 필요</span>';
+  return `<div class="page-head"><div><h1>채널 동기화</h1><p>오늘숙소 ↔ Channex ↔ 예약 플랫폼. 실패한 작업은 여기서 이유를 보고 다시 처리해요.</p></div><button class="btn" data-act="recheck">지금 대조하기</button></div>
+  <div class="wrap">
+    <section class="panel" aria-labelledby="sum-h"><h2 class="sr" id="sum-h">요약</h2><div class="summary">
+      <div><div class="lab">지금 상태</div><div class="big" aria-live="polite">${head}</div></div>
+      <div><div class="lab">웹훅 수신</div><div class="val"><span class="st ok">켜짐</span> <span class="note num">마지막 19:41</span></div></div>
+      <div><div class="lab">ACK 안 된 변경(피드)</div><div class="val num">0건</div></div>
+      <div><div class="lab">10분 점검</div><div class="val num">${esc(S.lastCheck || '19:40')}</div></div></div></section>
+    <section class="panel" aria-labelledby="job-h"><div class="panel-head"><h2 id="job-h">실패·대기 작업</h2><span class="note">429·시간 초과는 자동으로 다시 시도하고, 인증 만료는 다시 연결할 때까지 멈춰요.</span></div>
+      ${S.jobs.length ? `<ul class="jobs">${S.jobs.map(jobRow).join('')}</ul>` : `<div class="empty"><strong>실패한 작업이 없어요</strong>모든 요금·재고·메시지가 채널에 반영됐어요.</div>`}</section>
+    <section class="panel" aria-labelledby="ch-h"><div class="panel-head"><h2 id="ch-h">채널별 지원 범위</h2></div>
+      <table class="ctable"><thead><tr><th>채널</th><th>예약 수신</th><th>재고</th><th>요금</th><th>메시지</th><th>마지막 정상</th><th>연결</th></tr></thead><tbody>
+      ${S.channels.map((c) => `<tr><td class="c-name"><b>${esc(c.name)}</b><span class="m-st">${''}</span></td>${['res', 'inv', 'rate', 'msg'].map((k, i) => `<td data-l="${['예약', '재고', '요금', '메시지'][i]}"><span class="sup ${SUP[c[k]][1]}">${SUP[c[k]][0]}</span></td>`).join('')}<td class="c-last num" data-l=""><span class="m-only">마지막 정상 </span>${esc(c.last)}</td><td data-l="">${chSt(c)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="foot-note">지원·미지원은 Channex 공개 문서 기준이에요(메시지 API: Airbnb·Booking.com·Expedia). 이 계정에서 실제로 되는지는 진단 때 시험 숙소로 확인해 '확인됨'으로 바꿔요. Trip.com 요금은 아직 확인 전이에요.</div></section>
+    <section class="panel" aria-labelledby="log-h"><div class="panel-head"><h2 id="log-h">작업 이력</h2><span class="note">손님 이름·연락처·키는 기록에서 가려요</span></div>
+      <ul class="log">${S.log.slice(0, 7).map(([t, m]) => `<li><time>${esc(t)}</time><span>${esc(m)}</span></li>`).join('')}</ul></section>
+    <div class="demo-ctl"><span>데모 조작</span><button class="btn sm" data-act="sync-fail">불러오기 실패 화면 보기</button></div>
+  </div>`;
+}
+function jobRow(j) {
+  let st, act;
+  if (j.mode === 'auto') { st = j.running ? '<span class="st info run">다시 보내는 중</span>' : `<span class="st warn"><span>자동 재시도 ${j.tries}/5 · <span class="num" data-wait="${j.id}">${j.wait}</span>초 뒤</span></span>`; act = `<button class="btn sm" data-job="${j.id}" ${j.running ? 'disabled' : ''}>지금 다시 보내기</button>`; }
+  if (j.mode === 'manual') { const busy = S.sending.has(j.link); st = busy ? '<span class="st info run">다시 보내는 중</span>' : '<span class="st err">전달 확인 안 됨</span>'; act = `<button class="btn sm" data-job="${j.id}" ${busy ? 'disabled' : ''}>다시 보내기</button>`; }
+  if (j.mode === 'reauth') { st = j.running ? '<span class="st info run">연결하고 다시 보내는 중</span>' : '<span class="st err">자동 재시도 멈춤</span>'; act = `<button class="btn sm" data-job="${j.id}" ${j.running ? 'disabled' : ''}>다시 연결하고 재처리</button>`; }
+  if (j.mode === 'refetch') { st = '<span class="st warn">내부 기록과 원본이 다름</span>'; act = `<button class="btn sm" data-job="${j.id}">원본 다시 불러오기</button><a class="btn sm ghost" href="#/inbox" data-goto="${j.link}">대화 보기</a>`; }
+  return `<li class="job" data-j="${j.id}"><div><div class="what">${esc(j.kind)} · ${esc(j.ch)}</div><div class="det">${esc(j.det)} · 원인: ${esc(j.err)}</div><div style="margin-top:6px">${st}</div></div><div class="act">${act}</div></li>`;
+}
+async function runJob(id) {
+  const j = S.jobs.find((x) => x.id === id); if (!j) return;
+  if (j.mode === 'manual') { const t = S.threads.find((x) => x.id === j.link); return resend(t, true); }
+  if (j.mode === 'refetch') { const t = S.threads.find((x) => x.id === j.link); return refetch(t); }
+  if (j.running) return;
+  if (j.mode === 'reauth') { const ok = await confirmDialog('Trip.com 다시 연결', '실제 서비스에서는 Channex 연결 화면에서 인증을 다시 받아요. 데모에서는 연결됐다고 보고, 멈춰 있던 재고 전송을 같은 작업 키로 이어서 보내요.', '연결하고 재처리'); if (!ok) return; }
+  j.running = true; renderAll(); await sleep(1300);
+  S.jobs = S.jobs.filter((x) => x.id !== id);
+  const c = S.channels.find((x) => x.name === j.ch); if (c) { c.st = S.jobs.some((x) => x.ch === j.ch) ? 'warn' : 'ok'; c.last = nowStr(); }
+  S.log.unshift([FAKE_NOW, `${j.ch} ${j.kind} 재처리 · 반영 확인`]);
+  toast(`${j.ch} ${j.kind}을 다시 처리했어요.`);
+  renderAll();
+}
+let tick = null;
+function startTick() {
+  clearInterval(tick);
+  tick = setInterval(() => { const j = S.jobs.find((x) => x.id === 'j1'); if (!j || j.running) return; j.wait = Math.max(0, j.wait - 1); const el = document.querySelector('[data-wait="j1"]'); if (el) el.textContent = j.wait; if (j.wait === 0) { j.tries++; runJob('j1'); } }, 1000);
+}
+
+/* ---------- 라우팅·이벤트 ---------- */
+const TITLES = { inbox: '메시지', rules: '메시지 규칙', sync: '채널 동기화' };
+function renderAll() {
+  renderNav();
+  const v = $('#view');
+  if (S.route === 'inbox') { if (!$('#inbox')) v.innerHTML = viewInbox(); else document.querySelectorAll('.chip').forEach((c) => { c.setAttribute('aria-pressed', c.dataset.f === S.filter); c.querySelector('.n').textContent = countFor(c.dataset.f); }); renderThreads(); renderConv(); }
+  else { const keep = v.querySelector('details[open]'); v.innerHTML = S.route === 'rules' ? viewRules() : viewSync(); }
+  document.title = TITLES[S.route] + ' · 숙소 메시지·동기화 화면 모형';
+}
+function route() {
+  const r = (location.hash.match(/^#\/(\w+)/) || [])[1];
+  const nr = TITLES[r] ? r : 'inbox';
+  const changed = nr !== S.route || !$('#view').firstChild;
+  S.route = nr; $('#view').innerHTML = ''; document.body.classList.remove('chat');
+  renderAll();
+  if (changed) $('#view').focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button, a[data-goto]'); if (!b) return;
+  const t = S.threads.find((x) => x.id === S.sel);
+  if (b.dataset.goto) { S.sel = b.dataset.goto; S.open = true; return; }
+  if (b.dataset.f) { S.filter = b.dataset.f; renderAll(); return; }
+  if (b.dataset.t) { S.sel = b.dataset.t; S.open = true; const th = S.threads.find((x) => x.id === b.dataset.t); th.unread = false; renderAll(); if (window.innerWidth < 768) { window.scrollTo(0, 0); $('#conv h2')?.focus?.(); } return; }
+  if (b.dataset.lv && t) { if (S.langView[t.id] !== 'ko' && $('#draft') && !$('#draft').readOnly && $('#draft').value !== t.draft.text) t.editedText = $('#draft').value; S.langView[t.id] = b.dataset.lv; renderConv(); return; }
+  if (b.dataset.allow) { const ty = TYPES.find((x) => x.id === b.dataset.allow); const ok = await confirmDialog(`'${ty.name}' 자동발송 허용`, `${ty.days}일 동안 ${ty.n}건을 고치지 않고 보냈어요. 허용하면 이 유형 문의는 운영 시간(${S.hours}) 안에 확인 없이 바로 보내요. 근거(예약 원본·숙소 안내)가 모자라면 초안으로 남겨요.`, '허용하기'); if (ok) { ty.mode = 'auto'; toast(`'${ty.name}' 자동발송을 허용했어요.`); renderAll(); } return; }
+  if (b.dataset.stop) { const ty = TYPES.find((x) => x.id === b.dataset.stop); ty.mode = 'paused'; toast(`'${ty.name}' 자동발송을 멈췄어요. 관찰 기록은 남아 있어요.`); renderAll(); return; }
+  if (b.dataset.resume) { const ty = TYPES.find((x) => x.id === b.dataset.resume); ty.mode = 'auto'; toast(`'${ty.name}' 자동발송을 다시 켰어요.`); renderAll(); return; }
+  if (b.dataset.job) { runJob(b.dataset.job); return; }
+  const act = b.dataset.act; if (!act) return;
+  if (act === 'back') { S.open = false; renderAll(); return; }
+  if (act === 'send') return sendDraft(t, 'draft');
+  if (act === 'send-manual') return sendDraft(t, 'manual');
+  if (act === 'manual') { t.manual = true; if (t.state === 'mismatch') t.state = 'human'; renderConv(); $('#reply')?.focus(); return; }
+  if (act === 'refetch') return refetch(t);
+  if (act === 'resend') return resend(t, false);
+  if (act === 'regen') { t.editedText = undefined; S.langView[t.id] = 'guest'; const c = $('#draft'); c.value = ''; c.setAttribute('aria-busy', 'true'); await sleep(600); renderConv(); toast('같은 근거로 초안을 다시 만들었어요.'); return; }
+  if (act === 'copy') { try { await navigator.clipboard.writeText(t.draft.text); } catch (_) {} toast('초안을 복사했어요. Agoda 관리 화면에 붙여 넣어 보내 주세요.'); return; }
+  if (act === 'pause') { t.paused = !t.paused; toast(t.paused ? '이 손님에게는 자동발송을 멈췄어요.' : '이 손님 자동발송 멈춤을 풀었어요.'); renderConv(); return; }
+  if (act === 'global') { if (!S.globalStop) { const ok = await confirmDialog('자동발송을 모두 멈출까요?', '허용된 유형도 모두 초안까지만 만들어요. 관찰 기록은 그대로 남고, 다시 켜면 이어서 보내요.', '모두 멈추기', true); if (!ok) return; } S.globalStop = !S.globalStop; toast(S.globalStop ? '자동발송을 모두 멈췄어요.' : '자동발송을 다시 켰어요.'); renderAll(); return; }
+  if (act === 'recheck') { S.lastCheck = nowStr(); S.log.unshift([FAKE_NOW, '수동 대조 · 내부 기록과 채널 값 비교, 새 불일치 0건']); toast('대조했어요. 새로 다른 곳은 없어요.'); renderAll(); return; }
+  if (act === 'sync-fail') { S.syncErr = true; renderAll(); return; }
+  if (act === 'sync-reload') { S.syncErr = false; S.syncLoading = true; renderAll(); await sleep(900); S.syncLoading = false; renderAll(); return; }
+});
+document.addEventListener('input', (e) => {
+  const t = S.threads.find((x) => x.id === S.sel); if (!t) return;
+  if (e.target.id === 'draft' && !e.target.readOnly) { const was = t.editedText != null; t.editedText = e.target.value === t.draft.text ? undefined : e.target.value; if (was !== (t.editedText != null)) { const pos = e.target.selectionStart; renderConv(); const d = $('#draft'); d.focus(); d.setSelectionRange(pos, pos); } }
+  if (e.target.id === 'reply') { t.manualText = e.target.value; e.target.removeAttribute('aria-invalid'); }
+});
+document.addEventListener('change', (e) => { const k = e.target.dataset.set; if (k) { S[k] = e.target.value; toast('설정을 바꿨어요.'); } });
+window.addEventListener('hashchange', route);
+
+/* 시작: 큰 화면은 첫 대화를 열어 둠 */
+route();
+setTimeout(() => { S.loading = false; if (window.innerWidth >= 768 && !S.sel) S.sel = 't1'; renderAll(); startTick(); }, 700);
+</script>
+</body>
+</html>
